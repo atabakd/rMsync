@@ -13,9 +13,7 @@ import json
 import time
 from argparse import ArgumentParser
 from PyPDF2 import PdfFileReader
-sys.path.append("../maxio/tools") # Adds higher directory to python modules path.
-#from newLines.new_rM2svg import rm2svg
-#import rM2svg as rm2svg
+sys.path.append("../maxio/rm_tools") # Adds higher directory to python modules path.
 # needs imagemagick, pdftk
 
 __prog_name__ = "sync"
@@ -26,12 +24,12 @@ remarkableBackupDirectory = os.path.join(os.path.expanduser('~/'), "Documents/re
 remContent = "/xochitl"
 remarkableDirectory = "/home/root/.local/share/remarkable/xochitl"
 remarkableUsername = "root"
-remarkableIP = "10.11.99.1"
+remarkableIP = "192.168.1.76"
 # https://github.com/lschwetlick/maxio/tree/master/tools
 # conversionScriptPDF = "/Users/lisa/Documents/Projects/rMTools/maxio/tools/rM2pdf"
 # conversionScriptNotes = "/Users/lisa/Documents/Projects/rMTools/maxio/tools/rM2svg"
 # https://github.com/reHackable/scripts
-pushScript = os.path.join(os.path.expanduser('~/'), "Remarkable/programming/scripts/host/repush.sh")
+pushScript = os.path.join(os.path.expanduser('~/'), "Remarkable/scripts/host/repush.sh")
 bgPath = os.path.join(os.path.expanduser('~/'), "Documents/remarkableBackup/templates/")
 emptyRm = os.path.join(os.path.expanduser('~/'), "Documents/remarkableBackup/empty.rm")
 
@@ -80,21 +78,15 @@ def main():
 
 ### BACK UP ###
 # TODO: catch connection errors
-# TODO: only backup changed files (Problem is that rM doesnt run rsync)
 def backupRM():
     """
     Backs up all files on the remarkable so we can then convert them. Also its always nice to have a backup.
     Downside is that it kaes a while because rsync doesn't work and we are copying EVERYTHING!
     """
     print("Backing up your remarkable files")
-    #Sometimes the remarkable doesnt connect properly. In that case turn off & disconnect -> turn on -> reconnect
-    #shutil.rmtree("/Users/lisa/Documents/remarkableBackup" + remContent)
-    print("deleted old files")
-   # backupCommand = "".join(["scp -r ", remarkableUsername, "@", remarkableIP, ":", remarkableDirectory, " ", remarkableBackupDirectory])
     backupCommand = "".join(["rsync -ravhP ", remarkableUsername, "@", remarkableIP, ":", remarkableDirectory, " ", remarkableBackupDirectory])
     print(backupCommand)
     os.system(backupCommand)
-    # os.system("scp -r root@10.11.99.1:/home/root/.local/share/remarkable/xochitl /Users/lisa/Documents/remarkableBackup")
 
 def listFiles():
     """
@@ -149,9 +141,7 @@ def convertFiles():
         # Does this lines file have an associated pdf?
         AnnotPDF = os.path.isfile(refNrPath + ".pdf")
         # Get list of all rm files i.e. all pages
-        #npages = len(glob.glob(refNrPath+"/*.rm"))
         npages = content["pageCount"]
-        #import pdb;pdb.set_trace()
         if npages != 0:
             if AnnotPDF:
                 # deal with annotated pdfs
@@ -336,7 +326,8 @@ def convertNotebook(fname, refNrPath, pages):
     bg_pg = 0
     bglist = []
     for bg in backgrounds:
-        svg_path = str(bgPath) + bg.replace(" ", "\ ") + ".svg"
+        svg_path = str(bgPath) + bg + ".svg"
+        #svg_path = str(bgPath) + bg.replace(" ", "\ ") + ".svg"
         if os.path.exists(svg_path):
             convertSvg2PdfCmd = "".join(["rsvg-convert -f pdf -o ", "tempDir/bg_" + str(bg_pg) + ".pdf ", str(bgPath) + bg.replace(" ", "\ ") + ".svg"])
             os.system(convertSvg2PdfCmd)
@@ -346,7 +337,6 @@ def convertNotebook(fname, refNrPath, pages):
         bglist.append("tempDir/bg_"+str(bg_pg)+".pdf ")
         bg_pg += 1
     merged_bg = "tempDir/merged_bg.pdf"
-    #os.system("convert " + (" ").join(bglist) + " " + merged_bg)
     os.system("pdftk " + (" ").join(bglist) + " cat output " + merged_bg)
     input1 = PdfFileReader(open(merged_bg, 'rb'))
     pdfsize = input1.getPage(0).mediaBox
@@ -355,7 +345,6 @@ def convertNotebook(fname, refNrPath, pages):
 
     #npages = len(glob.glob(refNrPath+"/*.rm"))
     npages = len(pages)
-    #import pdb; pdb.set_trace()
     #pages = [int(os.path.basename(p).split('.')[0]) for p in glob.glob(refNrPath+"/*.rm")]
     #pages.sort()
     pdflist = []
@@ -367,7 +356,7 @@ def convertNotebook(fname, refNrPath, pages):
         # skip page if it doesnt extist anymore. This is fine in notebooks because nobody cares about the rM numbering.
         try:
             #rm2svg(rmpath, "tempDir/temprm"+str(pg)+".svg", coloured_annotations=False)
-            os.system("python ~/Remarkable/programming/maxio/tools/rM2svg.py -i " + rmpath+ " -o tempDir/temprm"+str(pg)+".svg")
+            os.system("python ~/Remarkable/maxio/rm_tools/rM2svg.py -i " + rmpath+ " -o tempDir/temprm"+str(pg)+".svg")
             convertSvg2PdfCmd = "".join(["rsvg-convert -f pdf -o ", "tempDir/temppdf" + str(pg), ".pdf ", "tempDir/temprm" + str(pg) + ".svg"])
             os.system(convertSvg2PdfCmd)
             pdflist.append("tempDir/temppdf"+str(pg)+".pdf")
@@ -401,14 +390,13 @@ def convertAnnotatedPDF(fname, refNrPath, origPDF, pages):
     # get info on origin pdf
     input1 = PdfFileReader(open(origPDF, "rb"))
     npages = input1.getNumPages()
-    #import pdb; pdb.set_trace()
     pdfsize = input1.getPage(0).mediaBox
     pdfx = int(pdfsize[2])
     pdfy = int(pdfsize[3])
     emptyPdfCmd = "convert xc:none -page {}x{} tempDir/none.pdf".format(pdfx, pdfy)
     os.system(emptyPdfCmd)
     #rm2svg(emptyRm, "tempDir/emptyrm.svg", coloured_annotations=False, x_width=pdfx, y_width=pdfy)
-    os.system("python ~/Remarkable/programming/maxio/tools/rM2svg.py -i " + emptyRm + " -o tempDir/emptyrm.svg --width {} --height {}".format(pdfx,pdfy))
+    os.system("python ~/Remarkable/maxio/rm_tools/rM2svg.py -i " + emptyRm + " -o tempDir/emptyrm.svg --width {} --height {}".format(pdfx,pdfy))
     # export
     pdflist = []
     for pg_idx in range(0, npages):
@@ -421,7 +409,7 @@ def convertAnnotatedPDF(fname, refNrPath, origPDF, pages):
             rmpath = refNrPath+"/"+pages[pg_idx]+".rm"
             if os.path.isfile(rmpath):
             #rm2svg(rmpath, "tempDir/temprm" + str(pg) + ".svg", coloured_annotations=False, x_width=pdfx, y_width=pdfy)
-                os.system("python ~/Remarkable/programming/maxio/tools/rM2svg.py -i " + rmpath + " -o tempDir/temprm" + pages[pg_idx] + ".svg --width {} --height {}".format(pdfx,pdfy))
+                os.system("python ~/Remarkable/maxio/rm_tools/rM2svg.py -i " + rmpath + " -o tempDir/temprm" + pages[pg_idx] + ".svg --width {} --height {}".format(pdfx,pdfy))
                 svg_path = "tempDir/temprm" + pages[pg_idx] + ".svg"
             else:
                 #svg_path = "tempDir/emptyrm.svg"
