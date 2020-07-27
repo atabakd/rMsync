@@ -13,6 +13,8 @@ import json
 import time
 from argparse import ArgumentParser
 from PyPDF2 import PdfFileReader
+from termcolor import colored
+
 sys.path.append("../maxio/rm_tools") # Adds higher directory to python modules path.
 # needs imagemagick, pdftk
 
@@ -24,7 +26,8 @@ remarkableBackupDirectory = os.path.join(os.path.expanduser('~/'), "Documents/re
 remContent = "/xochitl"
 remarkableDirectory = "/home/root/.local/share/remarkable/xochitl"
 remarkableUsername = "root"
-remarkableIP = "192.168.1.76"
+#remarkableIP = "192.168.1.76"
+remarkableIP = "10.11.99.1"
 # https://github.com/lschwetlick/maxio/tree/master/tools
 # conversionScriptPDF = "/Users/lisa/Documents/Projects/rMTools/maxio/tools/rM2pdf"
 # conversionScriptNotes = "/Users/lisa/Documents/Projects/rMTools/maxio/tools/rM2svg"
@@ -84,7 +87,7 @@ def backupRM():
     Downside is that it kaes a while because rsync doesn't work and we are copying EVERYTHING!
     """
     print("Backing up your remarkable files")
-    backupCommand = "".join(["rsync -ravhP ", remarkableUsername, "@", remarkableIP, ":", remarkableDirectory, " ", remarkableBackupDirectory])
+    backupCommand = "".join(["rsync -ravhP ", remarkableUsername, "@", remarkableIP, ":", remarkableDirectory, " ", remarkableBackupDirectory, " --delete-after"])
     print(backupCommand)
     os.system(backupCommand)
 
@@ -338,7 +341,11 @@ def convertNotebook(fname, refNrPath, pages):
         bg_pg += 1
     merged_bg = "tempDir/merged_bg.pdf"
     os.system("pdftk " + (" ").join(bglist) + " cat output " + merged_bg)
-    input1 = PdfFileReader(open(merged_bg, 'rb'))
+    try:
+        input1 = PdfFileReader(open(merged_bg, 'rb'))
+    except FileNotFoundError:
+        print(colored("Warning: Notebook not converted!", 'yellow'))
+        return False
     pdfsize = input1.getPage(0).mediaBox
     # pdfx = int(pdfsize[2])
     # pdfy = int(pdfsize[3])
